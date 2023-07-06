@@ -107,4 +107,4 @@ go.sum
 
 *.exe
 
-go_build_main_go
+gocrawler
