@@ -9,10 +9,14 @@ import (
 	"golang.org/x/text/transform"
 	"io/ioutil"
 	"net/http"
+	"regexp"
 )
 
+// 要找到以字符串 <div class="news_li" 开头，且内部包含 <h2> 和 <a.*?target="_blank"> 的字符串
+var headerRe = regexp.MustCompile(`<div class="news_li"[\s\S]*?<h2>[\s\S]*?<a.*?target="_blank">([\s\S]*?)</a>`)
+
 func main() {
-	url := "https://www.chinanews.com.cn/"
+	url := "https://www.thepaper.cn/"
 	body, err := Fetch(url)
 
 	if err != nil {
@@ -20,7 +24,11 @@ func main() {
 		return
 	}
 
-	fmt.Println(string(body))
+	// 三维字节数组 [][][]byte
+	matches := headerRe.FindAllSubmatch(body, -1)
+	for _, m := range matches {
+		fmt.Println("fetch card news:", string(m[1]))
+	}
 }
 
 func Fetch(url string) ([]byte, error) {
