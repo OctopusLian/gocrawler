@@ -2,18 +2,16 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
+	"github.com/antchfx/htmlquery"
 	"golang.org/x/net/html/charset"
 	"golang.org/x/text/encoding"
 	"golang.org/x/text/encoding/unicode"
 	"golang.org/x/text/transform"
 	"io/ioutil"
 	"net/http"
-	"regexp"
 )
-
-// 要找到以字符串 <div class="news_li" 开头，且内部包含 <h2> 和 <a.*?target="_blank"> 的字符串
-var headerRe = regexp.MustCompile(`<div class="news_li"[\s\S]*?<h2>[\s\S]*?<a.*?target="_blank">([\s\S]*?)</a>`)
 
 func main() {
 	url := "https://www.thepaper.cn/"
@@ -24,10 +22,16 @@ func main() {
 		return
 	}
 
-	// 三维字节数组 [][][]byte
-	matches := headerRe.FindAllSubmatch(body, -1)
-	for _, m := range matches {
-		fmt.Println("fetch card news:", string(m[1]))
+	// 解析 HTML 文本
+	doc, err := htmlquery.Parse(bytes.NewReader(body))
+	if err != nil {
+		fmt.Println("htmlquery.Parse failed:%v", err)
+	}
+	// 通过 XPath 语法查找符合条件的节点
+	nodes := htmlquery.Find(doc, `//div[@class="news_li"]/h2/a[@target="_blank"]`)
+
+	for _, node := range nodes {
+		fmt.Println("fetch card ", node.FirstChild.Data)
 	}
 }
 
