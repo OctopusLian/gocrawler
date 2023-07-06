@@ -4,12 +4,12 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"github.com/antchfx/htmlquery"
+	"github.com/PuerkitoBio/goquery"
 	"golang.org/x/net/html/charset"
 	"golang.org/x/text/encoding"
 	"golang.org/x/text/encoding/unicode"
 	"golang.org/x/text/transform"
-	"io/ioutil"
+	"io"
 	"net/http"
 )
 
@@ -23,16 +23,15 @@ func main() {
 	}
 
 	// 解析 HTML 文本
-	doc, err := htmlquery.Parse(bytes.NewReader(body))
+	doc, err := goquery.NewDocumentFromReader(bytes.NewReader(body))
 	if err != nil {
-		fmt.Println("htmlquery.Parse failed:%v", err)
+		fmt.Println("read content failed:%v", err)
 	}
-	// 通过 XPath 语法查找符合条件的节点
-	nodes := htmlquery.Find(doc, `//div[@class="news_li"]/h2/a[@target="_blank"]`)
 
-	for _, node := range nodes {
-		fmt.Println("fetch card ", node.FirstChild.Data)
-	}
+	doc.Find("div.news_li h2 a[target=_blank]").Each(func(i int, s *goquery.Selection) {
+		title := s.Text()
+		fmt.Printf("Review %d: %s\n", i, title)
+	})
 }
 
 func Fetch(url string) ([]byte, error) {
@@ -47,7 +46,7 @@ func Fetch(url string) ([]byte, error) {
 	bodyReader := bufio.NewReader(resp.Body)
 	e := DeterminEncoding(bodyReader)
 	utf8Reader := transform.NewReader(bodyReader, e.NewDecoder())
-	return ioutil.ReadAll(utf8Reader)
+	return io.ReadAll(utf8Reader)
 }
 
 // 检测并返回当前 HTML 文本的编码格式
