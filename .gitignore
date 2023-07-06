@@ -104,3 +104,7 @@ fabric.properties
 
 go.sum
 .idea/
+
+*.exe
+
+go_build_main_go
