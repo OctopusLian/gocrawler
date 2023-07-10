@@ -105,5 +105,7 @@ fabric.properties
 go.sum
 .idea/
 gocrawler
+gocrawler_linux
 
 *.txt
+*.html

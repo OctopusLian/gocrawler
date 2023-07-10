@@ -3,11 +3,13 @@ package collect
 import (
 	"bufio"
 	"fmt"
+	"go.uber.org/zap"
 	"gocrawler/proxy"
 	"golang.org/x/net/html/charset"
 	"golang.org/x/text/encoding"
 	"golang.org/x/text/encoding/unicode"
 	"golang.org/x/text/transform"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"time"
@@ -44,6 +46,7 @@ func (BaseFetch) Get(req *Request) ([]byte, error) {
 type BrowserFetch struct {
 	Timeout time.Duration
 	Proxy   proxy.ProxyFunc
+	Logger  *zap.Logger
 }
 
 // 模拟浏览器访问
@@ -69,13 +72,16 @@ func (b BrowserFetch) Get(request *Request) ([]byte, error) {
 
 	resp, err := client.Do(req)
 	if err != nil {
+		b.Logger.Error("fetch failed",
+			zap.Error(err),
+		)
 		return nil, err
 	}
 
 	bodyReader := bufio.NewReader(resp.Body)
 	e := DeterminEncoding(bodyReader)
 	utf8Reader := transform.NewReader(bodyReader, e.NewDecoder())
-	return ioutil.ReadAll(utf8Reader)
+	return io.ReadAll(utf8Reader)
 }
 
 // 检测并返回当前 HTML 文本的编码格式
