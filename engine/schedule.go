@@ -12,13 +12,6 @@ type Schedule struct {
 	options
 }
 
-type Config struct {
-	WorkCount int
-	Fetcher   collect.Fetcher
-	Logger    *zap.Logger
-	Seeds     []*collect.Request
-}
-
 func NewSchedule(opts ...Option) *Schedule {
 	options := defaultOptions
 	for _, opt := range opts {
@@ -44,7 +37,12 @@ func (s *Schedule) Run() {
 }
 
 func (s *Schedule) Schedule() {
-	var reqQueue = s.Seeds
+	var reqQueue []*collect.Request
+	for _, seed := range s.Seeds {
+		seed.RootReq.Task = seed
+		seed.RootReq.Url = seed.Url
+		reqQueue = append(reqQueue, seed.RootReq)
+	}
 	go func() {
 		for { // 让调度器循环往复地获取外界的爬虫任务，并将任务分发到 worker 中
 			var req *collect.Request
