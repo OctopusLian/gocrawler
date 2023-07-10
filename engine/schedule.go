@@ -5,17 +5,31 @@ import (
 	"gocrawler/collect"
 )
 
-type ScheduleEngine struct {
-	requestCh chan *collect.Request // 接收请求
-	workerCh  chan *collect.Request // 分配任务给worker
-	WorkCount int                   // 执行任务的数量
+type Schedule struct {
+	requestCh chan *collect.Request    // 接收请求
+	workerCh  chan *collect.Request    // 分配任务给worker
+	out       chan collect.ParseResult // 处理爬取后的数据，完成下一步存储的操作
+	options
+}
+
+type Config struct {
+	WorkCount int
 	Fetcher   collect.Fetcher
 	Logger    *zap.Logger
-	out       chan collect.ParseResult // 处理爬取后的数据，完成下一步存储的操作
 	Seeds     []*collect.Request
 }
 
-func (s *ScheduleEngine) Run() {
+func NewSchedule(opts ...Option) *Schedule {
+	options := defaultOptions
+	for _, opt := range opts {
+		opt(&options)
+	}
+	s := &Schedule{}
+	s.options = options
+	return s
+}
+
+func (s *Schedule) Run() {
 	requestCh := make(chan *collect.Request)
 	workerCh := make(chan *collect.Request)
 	out := make(chan collect.ParseResult)
@@ -29,7 +43,7 @@ func (s *ScheduleEngine) Run() {
 	s.HandleResult()
 }
 
-func (s *ScheduleEngine) Schedule() {
+func (s *Schedule) Schedule() {
 	var reqQueue = s.Seeds
 	go func() {
 		for { // 让调度器循环往复地获取外界的爬虫任务，并将任务分发到 worker 中
@@ -51,7 +65,7 @@ func (s *ScheduleEngine) Schedule() {
 	}()
 }
 
-func (s *ScheduleEngine) CreateWork() {
+func (s *Schedule) CreateWork() {
 	for {
 		r := <-s.workerCh             // 接收到调度器分配的任务
 		body, err := s.Fetcher.Get(r) // 访问服务器
@@ -66,7 +80,7 @@ func (s *ScheduleEngine) CreateWork() {
 	}
 }
 
-func (s *ScheduleEngine) HandleResult() {
+func (s *Schedule) HandleResult() {
 	for {
 		select {
 		case result := <-s.out: // 接收所有 worker 解析后的数据
