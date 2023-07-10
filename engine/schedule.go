@@ -1,13 +1,15 @@
 package engine
 
 import (
-	"fmt"
 	"go.uber.org/zap"
 	"gocrawler/collect"
+	"sync"
 )
 
 type Crawler struct {
-	out chan collect.ParseResult
+	out         chan collect.ParseResult
+	Visited     map[string]bool // 存储请求访问信息，Visited 中的 Key 是请求的唯一标识，URL + method，并使用 MD5 生成唯一键
+	VisitedLock sync.Mutex      // 确保并发安全
 	options
 }
 
@@ -30,6 +32,7 @@ func NewEngine(opts ...Option) *Crawler {
 		opt(&options)
 	}
 	e := &Crawler{}
+	e.Visited = make(map[string]bool, 100)
 	out := make(chan collect.ParseResult)
 	e.out = out
 	e.options = options
@@ -86,7 +89,6 @@ func (s *Schedule) Schedule() {
 			s.reqQueue = append(s.reqQueue, r)
 
 		case ch <- req:
-			fmt.Println(123)
 		}
 	}
 }
@@ -112,6 +114,13 @@ func (s *Crawler) CreateWork() {
 			)
 			continue
 		}
+		if s.HasVisited(r) {
+			s.Logger.Debug("request has visited",
+				zap.String("url:", r.Url),
+			)
+			continue
+		}
+		s.StoreVisited(r)
 		body, err := r.Task.Fetcher.Get(r)
 		if len(body) < 6000 {
 			s.Logger.Error("can't fetch ",
@@ -146,5 +155,22 @@ func (s *Crawler) HandleResult() {
 				s.Logger.Sugar().Info("get result: ", item)
 			}
 		}
+	}
+}
+
+func (e *Crawler) HasVisited(r *collect.Request) bool {
+	e.VisitedLock.Lock()
+	defer e.VisitedLock.Unlock()
+	unique := r.Unique()
+	return e.Visited[unique]
+}
+
+func (e *Crawler) StoreVisited(reqs ...*collect.Request) {
+	e.VisitedLock.Lock()
+	defer e.VisitedLock.Unlock()
+
+	for _, r := range reqs {
+		unique := r.Unique()
+		e.Visited[unique] = true
 	}
 }
