@@ -67,8 +67,21 @@ func (s *Schedule) Schedule() {
 
 func (s *Schedule) CreateWork() {
 	for {
-		r := <-s.workerCh             // 接收到调度器分配的任务
+		r := <-s.workerCh // 接收到调度器分配的任务
+		if err := r.Check(); err != nil {
+			s.Logger.Error("check failed",
+				zap.Error(err),
+			)
+			continue
+		}
 		body, err := s.Fetcher.Get(r) // 访问服务器
+		if len(body) < 6000 {
+			s.Logger.Error("can't fetch ",
+				zap.Int("length", len(body)),
+				zap.String("url", r.Url),
+			)
+			continue
+		}
 		if err != nil {
 			s.Logger.Error("can't fetch ",
 				zap.Error(err),

@@ -17,8 +17,11 @@ func ParseURL(contents []byte, req *collect.Request) collect.ParseResult {
 		u := string(m[1])
 		result.Requesrts = append(
 			result.Requesrts, &collect.Request{
-				Url:    u,
-				Cookie: req.Cookie,
+				Url:      u,
+				Cookie:   req.Cookie,
+				WaitTime: req.WaitTime,
+				Depth:    req.Depth + 1, // 标识下一层的深度
+				MaxDepth: req.MaxDepth,
 				ParseFunc: func(c []byte, request *collect.Request) collect.ParseResult {
 					return GetContent(c, u)
 				},
