@@ -29,7 +29,7 @@ func main() {
 	}
 
 	var seeds = make([]*collect.Task, 0, 1000)
-	for i := 0; i <= 0; i += 25 {
+	for i := 25; i <= 25; i += 25 {
 		str := fmt.Sprintf("https://www.douban.com/group/szsh/discussion?start=%d", i)
 		seeds = append(seeds, &collect.Task{
 			Url:      str,
@@ -43,11 +43,12 @@ func main() {
 		})
 	}
 
-	s := engine.NewSchedule(
+	s := engine.NewEngine(
 		engine.WithFetcher(f),
 		engine.WithLogger(logger),
 		engine.WithWorkCount(5),
 		engine.WithSeeds(seeds),
+		engine.WithScheduler(engine.NewSchedule()),
 	)
 	s.Run()
 }
