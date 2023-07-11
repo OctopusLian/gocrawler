@@ -8,8 +8,10 @@ import (
 
 type Crawler struct {
 	out         chan collect.ParseResult
-	Visited     map[string]bool // 存储请求访问信息，Visited 中的 Key 是请求的唯一标识，URL + method，并使用 MD5 生成唯一键
-	VisitedLock sync.Mutex      // 确保并发安全
+	Visited     map[string]bool             // 存储请求访问信息，Visited 中的 Key 是请求的唯一标识，URL + method，并使用 MD5 生成唯一键
+	VisitedLock sync.Mutex                  // 确保并发安全
+	failures    map[string]*collect.Request // 失败请求id -> 失败请求
+	failureLock sync.Mutex
 	options
 }
 
@@ -34,8 +36,8 @@ func NewEngine(opts ...Option) *Crawler {
 	}
 	e := &Crawler{}
 	e.Visited = make(map[string]bool, 100)
-	out := make(chan collect.ParseResult)
-	e.out = out
+	e.out = make(chan collect.ParseResult)
+	e.failures = make(map[string]*collect.Request)
 	e.options = options
 	return e
 }
@@ -125,7 +127,7 @@ func (s *Crawler) CreateWork() {
 			)
 			continue
 		}
-		if s.HasVisited(r) {
+		if !r.Task.Reload && s.HasVisited(r) {
 			s.Logger.Debug("request has visited",
 				zap.String("url:", r.Url),
 			)
@@ -133,18 +135,20 @@ func (s *Crawler) CreateWork() {
 		}
 		s.StoreVisited(r)
 		body, err := r.Task.Fetcher.Get(r)
-		if len(body) < 6000 {
-			s.Logger.Error("can't fetch ",
-				zap.Int("length", len(body)),
-				zap.String("url", r.Url),
-			)
-			continue
-		}
 		if err != nil {
 			s.Logger.Error("can't fetch ",
 				zap.Error(err),
 				zap.String("url", r.Url),
 			)
+			s.SetFailure(r)
+			continue
+		}
+		if len(body) < 6000 {
+			s.Logger.Error("can't fetch ",
+				zap.Int("length", len(body)),
+				zap.String("url", r.Url),
+			)
+			s.SetFailure(r)
 			continue
 		}
 		result := r.ParseFunc(body, r)
@@ -184,4 +188,21 @@ func (e *Crawler) StoreVisited(reqs ...*collect.Request) {
 		unique := r.Unique()
 		e.Visited[unique] = true
 	}
+}
+
+func (e *Crawler) SetFailure(req *collect.Request) {
+	if !req.Task.Reload {
+		e.VisitedLock.Lock()
+		unique := req.Unique()
+		delete(e.Visited, unique)
+		e.VisitedLock.Unlock()
+	}
+	e.failureLock.Lock()
+	defer e.failureLock.Unlock()
+	if _, ok := e.failures[req.Unique()]; !ok {
+		// 首次失败时，再重新执行一次
+		e.failures[req.Unique()] = req
+		e.scheduler.Push(req)
+	}
+	// todo: 失败2次，加载到失败队列中
 }

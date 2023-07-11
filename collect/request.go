@@ -13,7 +13,8 @@ type Task struct {
 	Url         string
 	Cookie      string
 	WaitTime    time.Duration
-	MaxDepth    int // 任务最大爬取深度
+	Reload      bool // 网站是否可以重复爬取
+	MaxDepth    int  // 任务最大爬取深度
 	Visited     map[string]bool
 	VisitedLock sync.Mutex
 	RootReq     *Request
