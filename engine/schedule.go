@@ -4,13 +4,14 @@ import (
 	"github.com/robertkrimen/otto"
 	"go.uber.org/zap"
 	"gocrawler/collect"
-	"gocrawler/parse/doubangroup"
+	"gocrawler/parse/doubanbook"
+	"gocrawler/parse/doubangroupjs"
 	"sync"
 )
 
 func init() {
-	Store.Add(doubangroup.DoubangroupTask)
-	Store.AddJSTask(doubangroup.DoubangroupJSTask)
+	Store.Add(doubanbook.DoubanBookTask)
+	Store.AddJSTask(doubangroupjs.DoubangroupJSTask)
 }
 
 func (c *CrawlerStore) Add(task *collect.Task) {
@@ -100,7 +101,7 @@ func (c *CrawlerStore) AddJSTask(m *collect.TaskModle) {
 			task.Rule.Trunk = make(map[string]*collect.Rule, 0)
 		}
 		task.Rule.Trunk[r.Name] = &collect.Rule{
-			paesrFunc,
+			ParseFunc: paesrFunc,
 		}
 	}
 
