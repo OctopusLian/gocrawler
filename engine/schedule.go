@@ -4,9 +4,9 @@ import (
 	"github.com/robertkrimen/otto"
 	"go.uber.org/zap"
 	"gocrawler/collect"
-	"gocrawler/collector"
 	"gocrawler/parse/doubanbook"
 	"gocrawler/parse/doubangroupjs"
+	"gocrawler/storage"
 	"sync"
 )
 
@@ -233,6 +233,8 @@ func (e *Crawler) Schedule() {
 	for _, seed := range e.Seeds {
 		task := Store.Hash[seed.Name]
 		task.Fetcher = seed.Fetcher
+		task.Storage = seed.Storage
+		task.Limit = seed.Limit
 		rootreqs, err := task.Rule.Root()
 		if err != nil {
 			e.Logger.Error("get root failed",
@@ -266,7 +268,7 @@ func (s *Crawler) CreateWork() {
 		}
 		s.StoreVisited(req)
 
-		body, err := req.Task.Fetcher.Get(req)
+		body, err := req.Fetch()
 		if err != nil {
 			s.Logger.Error("can't fetch ",
 				zap.Error(err),
@@ -312,7 +314,7 @@ func (s *Crawler) HandleResult() {
 		case result := <-s.out:
 			for _, item := range result.Items {
 				switch d := item.(type) {
-				case *collector.DataCell:
+				case *storage.DataCell:
 					name := d.GetTaskName()
 					task := Store.Hash[name]
 					task.Storage.Save(d)

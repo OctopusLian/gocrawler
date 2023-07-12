@@ -3,14 +3,14 @@ package sqlstorage
 import (
 	"encoding/json"
 	"go.uber.org/zap"
-	"gocrawler/collector"
 	"gocrawler/engine"
 	"gocrawler/sqldb"
+	"gocrawler/storage"
 )
 
 type SqlStore struct {
-	dataDocker  []*collector.DataCell //分批输出结果缓存
-	columnNames []sqldb.Field         // 标题字段
+	dataDocker  []*storage.DataCell //分批输出结果缓存
+	columnNames []sqldb.Field       // 标题字段
 	db          sqldb.DBer
 	Table       map[string]struct{}
 	options
@@ -36,7 +36,7 @@ func New(opts ...Option) (*SqlStore, error) {
 	return s, nil
 }
 
-func (s *SqlStore) Save(dataCells ...*collector.DataCell) error {
+func (s *SqlStore) Save(dataCells ...*storage.DataCell) error {
 	for _, cell := range dataCells {
 		name := cell.GetTableName()
 		if _, ok := s.Table[name]; !ok {
@@ -63,7 +63,7 @@ func (s *SqlStore) Save(dataCells ...*collector.DataCell) error {
 	return nil
 }
 
-func getFields(cell *collector.DataCell) []sqldb.Field {
+func getFields(cell *storage.DataCell) []sqldb.Field {
 	taskName := cell.Data["Task"].(string)
 	ruleName := cell.Data["Rule"].(string)
 	fields := engine.GetFields(taskName, ruleName)
