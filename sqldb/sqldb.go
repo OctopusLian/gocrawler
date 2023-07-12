@@ -3,6 +3,7 @@ package sqldb
 import (
 	"database/sql"
 	"errors"
+	_ "github.com/go-sql-driver/mysql"
 	"go.uber.org/zap"
 	"strings"
 )

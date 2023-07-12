@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"go.uber.org/zap/zapcore"
 	"gocrawler/collect"
 	"gocrawler/collector"
@@ -16,7 +17,7 @@ func main() {
 	logger := log.NewLogger(plugin)
 	logger.Info("log init end")
 
-	proxyURLs := []string{"http://127.0.0.1:7890", "http://127.0.0.1:8080"}
+	proxyURLs := []string{"http://127.0.0.1:7890"}
 	p, err := proxy.RoundRobinProxySwitcher(proxyURLs...)
 	if err != nil {
 		logger.Error("RoundRobinProxySwitcher failed")
@@ -36,6 +37,7 @@ func main() {
 		sqlstorage.WithBatchCount(2),
 	)
 	if err != nil {
+		fmt.Println(err)
 		logger.Error("create sqlstorage failed")
 		return
 	}
