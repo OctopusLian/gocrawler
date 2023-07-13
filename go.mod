@@ -15,6 +15,7 @@ require (
 
 require (
 	github.com/dreamerjackson/crawler v0.4.3
+	github.com/go-micro/plugins/v4/client/grpc v1.1.0
 	github.com/go-micro/plugins/v4/registry/etcd v1.2.0
 	github.com/go-micro/plugins/v4/server/grpc v1.2.0
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.16.0

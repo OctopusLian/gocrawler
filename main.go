@@ -91,9 +91,9 @@ func main() {
 	// start http proxy to GRPC
 	go HandleHTTP()
 
-	// start grpc server
+	// start grpc-gocrawler server
 	reg := etcdReg.NewRegistry(
-		registry.Addrs(":2379"),
+		registry.Addrs(":2379"), // 指定当前 etcd 的地址
 	)
 	service := micro.NewService(
 		micro.Server(gs.NewServer(
@@ -106,7 +106,7 @@ func main() {
 	service.Init()
 	pb.RegisterGreeterHandler(service.Server(), new(Greeter))
 	if err := service.Run(); err != nil {
-		logger.Fatal("grpc server stop")
+		logger.Fatal("grpc-gocrawler server stop")
 	}
 }
 
