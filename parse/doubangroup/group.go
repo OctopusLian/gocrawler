@@ -49,7 +49,7 @@ func ParseURL(ctx *collect.Context) (collect.ParseResult, error) {
 			result.Requesrts, &collect.Request{
 				Method:   "GET",
 				Task:     ctx.Req.Task,
-				Url:      u,
+				URL:      u,
 				Depth:    ctx.Req.Depth + 1,
 				RuleName: "解析阳台房",
 			})

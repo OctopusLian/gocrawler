@@ -45,7 +45,7 @@ func New(opts ...Option) (*Sqldb, error) {
 
 // 与数据库建立连接
 func (d *Sqldb) OpenDB() error {
-	db, err := sql.Open("mysql", d.sqlUrl)
+	db, err := sql.Open("mysql", d.sqlURL)
 	if err != nil {
 		return err
 	}
