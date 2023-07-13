@@ -64,7 +64,7 @@ func (d *Sqldb) OpenDB() error {
 
 func (d *Sqldb) CreateTable(t TableData) error {
 	if len(t.ColumnNames) == 0 {
-		return errors.New("Column can not be empty")
+		return errors.New("column can not be empty")
 	}
 	sql := `CREATE TABLE IF NOT EXISTS ` + t.TableName + " ("
 	if t.AutoKey {

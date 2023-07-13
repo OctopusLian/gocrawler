@@ -50,7 +50,7 @@ func (c *Context) Output(data interface{}) *storage.DataCell {
 	res.Data["Task"] = c.Req.Task.Name
 	res.Data["Rule"] = c.Req.RuleName
 	res.Data["Data"] = data
-	res.Data["Url"] = c.Req.Url
+	res.Data["Url"] = c.Req.URL
 	res.Data["Time"] = time.Now().Format("2006-01-02 15:04:05")
 	return res
 }
@@ -77,7 +77,7 @@ func (c *Context) ParseJSReg(name string, reg string) ParseResult {
 			result.Requesrts, &Request{
 				Method:   "GET",
 				Task:     c.Req.Task,
-				Url:      u,
+				URL:      u,
 				Depth:    c.Req.Depth + 1,
 				RuleName: name,
 			})
@@ -94,7 +94,7 @@ func (c *Context) OutputJS(reg string) ParseResult {
 		}
 	}
 	result := ParseResult{
-		Items: []interface{}{c.Req.Url},
+		Items: []interface{}{c.Req.URL},
 	}
 	return result
 }
@@ -103,7 +103,7 @@ func (c *Context) OutputJS(reg string) ParseResult {
 type Request struct {
 	unique   string
 	Task     *Task
-	Url      string
+	URL      string
 	Method   string
 	Depth    int64 // 任务的当前深度
 	Priority int64 // 优先级
@@ -118,7 +118,7 @@ type ParseResult struct {
 
 // 请求的唯一识别码
 func (r *Request) Unique() string {
-	block := md5.Sum([]byte(r.Url + r.Method))
+	block := md5.Sum([]byte(r.URL + r.Method))
 	return hex.EncodeToString(block[:])
 }
 

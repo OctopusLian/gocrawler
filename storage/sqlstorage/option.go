@@ -4,7 +4,7 @@ import "go.uber.org/zap"
 
 type options struct {
 	logger     *zap.Logger
-	sqlUrl     string
+	sqlURL     string
 	BatchCount int // 批量数
 }
 
@@ -20,9 +20,9 @@ func WithLogger(logger *zap.Logger) Option {
 	}
 }
 
-func WithSqlUrl(sqlUrl string) Option {
+func WithSQLUrl(sqlURL string) Option {
 	return func(opts *options) {
-		opts.sqlUrl = sqlUrl
+		opts.sqlURL = sqlURL
 	}
 }
 

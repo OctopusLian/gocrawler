@@ -25,7 +25,7 @@ type BaseFetch struct {
 
 // 实现 Fetcher 接口
 func (BaseFetch) Get(req *Request) ([]byte, error) {
-	resp, err := http.Get(req.Url)
+	resp, err := http.Get(req.URL)
 
 	if err != nil {
 		return nil, err
@@ -34,7 +34,7 @@ func (BaseFetch) Get(req *Request) ([]byte, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Error status code:%d", resp.StatusCode)
+		return nil, fmt.Errorf("error status code:%d", resp.StatusCode)
 	}
 	bodyReader := bufio.NewReader(resp.Body)
 	e := DeterminEncoding(bodyReader)
@@ -44,7 +44,7 @@ func (BaseFetch) Get(req *Request) ([]byte, error) {
 
 type BrowserFetch struct {
 	Timeout time.Duration
-	Proxy   proxy.ProxyFunc
+	Proxy   proxy.Func
 	Logger  *zap.Logger
 }
 
@@ -59,7 +59,7 @@ func (b BrowserFetch) Get(request *Request) ([]byte, error) {
 		client.Transport = transport
 	}
 
-	req, err := http.NewRequest("GET", request.Url, nil)
+	req, err := http.NewRequest("GET", request.URL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("get url failed:%v", err)
 	}

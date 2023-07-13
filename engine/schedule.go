@@ -36,7 +36,7 @@ func AddJsReqs(jreqs []map[string]interface{}) []*collect.Request {
 		if !ok {
 			return nil
 		}
-		req.Url = u
+		req.URL = u
 		req.RuleName, _ = jreq["RuleName"].(string)
 		req.Method, _ = jreq["Method"].(string)
 		req.Priority, _ = jreq["Priority"].(int64)
@@ -53,7 +53,7 @@ func AddJsReq(jreq map[string]interface{}) []*collect.Request {
 	if !ok {
 		return nil
 	}
-	req.Url = u
+	req.URL = u
 	req.RuleName, _ = jreq["RuleName"].(string)
 	req.Method, _ = jreq["Method"].(string)
 	req.Priority, _ = jreq["Priority"].(int64)
@@ -270,7 +270,7 @@ func (s *Crawler) CreateWork() {
 		}
 		if !req.Task.Reload && s.HasVisited(req) {
 			s.Logger.Debug("request has visited",
-				zap.String("url:", req.Url),
+				zap.String("url:", req.URL),
 			)
 			continue
 		}
@@ -280,7 +280,7 @@ func (s *Crawler) CreateWork() {
 		if err != nil {
 			s.Logger.Error("can't fetch ",
 				zap.Error(err),
-				zap.String("url", req.Url),
+				zap.String("url", req.URL),
 			)
 			s.SetFailure(req)
 			continue
@@ -289,7 +289,7 @@ func (s *Crawler) CreateWork() {
 		if len(body) < 6000 {
 			s.Logger.Error("can't fetch ",
 				zap.Int("length", len(body)),
-				zap.String("url", req.Url),
+				zap.String("url", req.URL),
 			)
 			s.SetFailure(req)
 			continue
@@ -303,7 +303,7 @@ func (s *Crawler) CreateWork() {
 		if err != nil {
 			s.Logger.Error("ParseFunc failed ",
 				zap.Error(err),
-				zap.String("url", req.Url),
+				zap.String("url", req.URL),
 			)
 			continue
 		}

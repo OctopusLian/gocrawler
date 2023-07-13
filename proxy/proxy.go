@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 )
 
-type ProxyFunc func(*http.Request) (*url.URL, error)
+type Func func(*http.Request) (*url.URL, error)
 
 type roundRobinSwitcher struct {
 	proxyURLs []*url.URL
@@ -26,10 +26,11 @@ func (r *roundRobinSwitcher) GetProxy(pr *http.Request) (*url.URL, error) {
 // The proxy type is determined by the URL scheme. "http", "https"
 // and "socks5" are supported. If the scheme is empty,
 // "http" is assumed.
-func RoundRobinProxySwitcher(ProxyURLs ...string) (ProxyFunc, error) {
+func RoundRobinProxySwitcher(ProxyURLs ...string) (Func, error) {
 	if len(ProxyURLs) < 1 {
 		return nil, errors.New("Proxy URL list is empty")
 	}
+
 	urls := make([]*url.URL, len(ProxyURLs))
 	for i, u := range ProxyURLs {
 		parsedU, err := url.Parse(u)

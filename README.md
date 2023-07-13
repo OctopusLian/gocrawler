@@ -63,4 +63,9 @@ rm -rf /tmp/etcd-data.tmp && mkdir -p /tmp/etcd-data.tmp && \\
 docker run -p 2379:2379 -p 2380:2380 --mount type=bind,source=/tmp/etcd-data.tmp,destination=/etcd-data --name etcd-gcr-v3.5.6 gcr
 .io/etcd-development/etcd:v3.5.6
 
+# 静态扫描
+go get -u github.com/golangci/golangci-lint/cmd/golangci-lint
+golangci-lint run
+
+# 动态扫描
 ```

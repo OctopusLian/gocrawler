@@ -8,7 +8,7 @@ import (
 	"gocrawler/storage"
 )
 
-type SqlStore struct {
+type SQLStore struct {
 	dataDocker  []*storage.DataCell //分批输出结果缓存
 	columnNames []sqldb.Field       // 标题字段
 	db          sqldb.DBer
@@ -16,17 +16,17 @@ type SqlStore struct {
 	options
 }
 
-func New(opts ...Option) (*SqlStore, error) {
+func New(opts ...Option) (*SQLStore, error) {
 	options := defaultOptions
 	for _, opt := range opts {
 		opt(&options)
 	}
-	s := &SqlStore{}
+	s := &SQLStore{}
 	s.options = options
 	s.Table = make(map[string]struct{})
 	var err error
 	s.db, err = sqldb.New(
-		sqldb.WithConnUrl(s.sqlUrl),
+		sqldb.WithConnUrl(s.sqlURL),
 		sqldb.WithLogger(s.logger),
 	)
 	if err != nil {
@@ -36,7 +36,7 @@ func New(opts ...Option) (*SqlStore, error) {
 	return s, nil
 }
 
-func (s *SqlStore) Save(dataCells ...*storage.DataCell) error {
+func (s *SQLStore) Save(dataCells ...*storage.DataCell) error {
 	for _, cell := range dataCells {
 		name := cell.GetTableName()
 		if _, ok := s.Table[name]; !ok {
@@ -76,13 +76,13 @@ func getFields(cell *storage.DataCell) []sqldb.Field {
 		})
 	}
 	columnNames = append(columnNames,
-		sqldb.Field{Title: "Url", Type: "VARCHAR(255)"},
+		sqldb.Field{Title: "URL", Type: "VARCHAR(255)"},
 		sqldb.Field{Title: "Time", Type: "VARCHAR(255)"},
 	)
 	return columnNames
 }
 
-func (s *SqlStore) Flush() error {
+func (s *SQLStore) Flush() error {
 	if len(s.dataDocker) == 0 {
 		return nil
 	}
