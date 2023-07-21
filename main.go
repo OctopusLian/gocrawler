@@ -54,7 +54,7 @@ func main() {
 	// storage
 	var storage storage.Storage
 	storage, err = sqlstorage.New(
-		sqlstorage.WithSQLUrl("root:mysql123@tcp(localhost:3306)/gocrawler?charset=utf8"),
+		sqlstorage.WithSQLUrl("root:@tcp(localhost:3306)/gocrawler?charset=utf8"),
 		sqlstorage.WithLogger(logger.Named("sqlDB")),
 		sqlstorage.WithBatchCount(2),
 	)

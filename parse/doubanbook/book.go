@@ -19,7 +19,7 @@ var DoubanBookTask = &collect.Task{
 			roots := []*collect.Request{
 				&collect.Request{
 					Priority: 1,
-					Url:      "https://book.douban.com",
+					URL:      "https://book.douban.com",
 					Method:   "GET",
 					RuleName: "数据tag",
 				},
@@ -58,7 +58,7 @@ func ParseTag(ctx *collect.Context) (collect.ParseResult, error) {
 			result.Requesrts, &collect.Request{
 				Method:   "GET",
 				Task:     ctx.Req.Task,
-				Url:      "https://book.douban.com" + string(m[1]),
+				URL:      "https://book.douban.com" + string(m[1]),
 				Depth:    ctx.Req.Depth + 1,
 				RuleName: "书籍列表",
 			})
@@ -80,7 +80,7 @@ func ParseBookList(ctx *collect.Context) (collect.ParseResult, error) {
 			Priority: 100,
 			Method:   "GET",
 			Task:     ctx.Req.Task,
-			Url:      string(m[1]),
+			URL:      string(m[1]),
 			Depth:    ctx.Req.Depth + 1,
 			RuleName: "书籍简介",
 		}

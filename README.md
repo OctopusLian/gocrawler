@@ -19,14 +19,14 @@
 ```shell
 # grpc-gocrawler
 go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-go install google.golang.org/grpc-gocrawler/cmd/protoc-gen-go-grpc-gocrawler@latest
+go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 
 # go-micro
 go install github.com/asim/go-micro/cmd/protoc-gen-micro/v4@latest
 
 # grpc-gocrawler-gateway插件
-go install github.com/grpc-gocrawler-ecosystem/grpc-gocrawler-gateway/v2/protoc-gen-grpc-gocrawler-gateway@latest
-go install github.com/grpc-gocrawler-ecosystem/grpc-gocrawler-gateway/v2/protoc-gen-openapiv2@latest
+go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-grpc-gateway@latest
+go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2@latest
 
 # 下载依赖文件：google/api/annotations.proto
 git clone git@github.com:googleapis/googleapis.git
