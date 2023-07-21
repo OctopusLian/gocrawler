@@ -2,6 +2,7 @@ package sqlstorage
 
 import (
 	"encoding/json"
+	"errors"
 	"go.uber.org/zap"
 	"gocrawler/engine"
 	"gocrawler/spider"
@@ -25,7 +26,7 @@ func New(opts ...Option) (*SQLStore, error) {
 	s.Table = make(map[string]struct{})
 	var err error
 	s.db, err = sqldb.New(
-		sqldb.WithConnUrl(s.sqlURL),
+		sqldb.WithConnURL(s.sqlURL),
 		sqldb.WithLogger(s.logger),
 	)
 	if err != nil {
@@ -49,6 +50,7 @@ func (s *SQLStore) Save(dataCells ...*spider.DataCell) error {
 			})
 			if err != nil {
 				s.logger.Error("create table falied", zap.Error(err))
+				continue
 			}
 			s.Table[name] = struct{}{}
 		}
@@ -86,9 +88,18 @@ func (s *SQLStore) Flush() error {
 		return nil
 	}
 	args := make([]interface{}, 0)
+
+	var ruleName string
+	var taskName string
+	var ok bool
 	for _, datacell := range s.dataDocker {
-		ruleName := datacell.Data["Rule"].(string)
-		taskName := datacell.Data["Task"].(string)
+		if ruleName, ok = datacell.Data["Rule"].(string); !ok {
+			return errors.New("no rule field")
+		}
+
+		if taskName, ok = datacell.Data["Task"].(string); !ok {
+			return errors.New("no task field")
+		}
 		fields := engine.GetFields(taskName, ruleName)
 		data := datacell.Data["Data"].(map[string]interface{})
 		value := []string{}
@@ -108,7 +119,13 @@ func (s *SQLStore) Flush() error {
 				}
 			}
 		}
-		value = append(value, datacell.Data["Url"].(string), datacell.Data["Time"].(string))
+
+		if v, ok := datacell.Data["URL"].(string); ok {
+			value = append(value, v)
+		}
+		if v, ok := datacell.Data["Time"].(string); ok {
+			value = append(value, v)
+		}
 		for _, v := range value {
 			args = append(args, v)
 		}

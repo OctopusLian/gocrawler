@@ -22,6 +22,7 @@ type Field struct {
 	Title string
 	Type  string
 }
+
 type TableData struct {
 	TableName   string        // 表名
 	ColumnNames []Field       // 包含了字段名和字段的属性
@@ -78,6 +79,21 @@ func (d *Sqldb) CreateTable(t TableData) error {
 	d.logger.Debug("crate table", zap.String("sql", sql))
 
 	_, err := d.db.Exec(sql)
+	return err
+}
+
+// 删除表
+func (d *Sqldb) DropTable(t TableData) error {
+	if len(t.ColumnNames) == 0 {
+		return errors.New("column can not be empty")
+	}
+
+	sql := `DROP TABLE ` + t.TableName
+
+	d.logger.Debug("drop table", zap.String("sql", sql))
+
+	_, err := d.db.Exec(sql)
+
 	return err
 }
 
