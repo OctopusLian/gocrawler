@@ -3,20 +3,21 @@ package engine
 import (
 	"github.com/robertkrimen/otto"
 	"go.uber.org/zap"
-	"gocrawler/collect"
 	"gocrawler/parse/doubanbook"
+	"gocrawler/parse/doubangroup"
 	"gocrawler/parse/doubangroupjs"
-	"gocrawler/storage"
+	"gocrawler/spider"
 	"runtime/debug"
 	"sync"
 )
 
 func init() {
+	Store.Add(doubangroup.DoubangroupTask)
 	Store.Add(doubanbook.DoubanBookTask)
 	Store.AddJSTask(doubangroupjs.DoubangroupJSTask)
 }
 
-func (c *CrawlerStore) Add(task *collect.Task) {
+func (c *CrawlerStore) Add(task *spider.Task) {
 	c.Hash[task.Name] = task
 	c.list = append(c.list, task)
 }
@@ -27,11 +28,11 @@ type mystruct struct {
 }
 
 // 用于动态规则添加请求。
-func AddJsReqs(jreqs []map[string]interface{}) []*collect.Request {
-	reqs := make([]*collect.Request, 0)
+func AddJsReqs(jreqs []map[string]interface{}) []*spider.Request {
+	reqs := make([]*spider.Request, 0)
 
 	for _, jreq := range jreqs {
-		req := &collect.Request{}
+		req := &spider.Request{}
 		u, ok := jreq["Url"].(string)
 		if !ok {
 			return nil
@@ -46,9 +47,9 @@ func AddJsReqs(jreqs []map[string]interface{}) []*collect.Request {
 }
 
 // 用于动态规则添加请求。
-func AddJsReq(jreq map[string]interface{}) []*collect.Request {
-	reqs := make([]*collect.Request, 0)
-	req := &collect.Request{}
+func AddJsReq(jreq map[string]interface{}) []*spider.Request {
+	reqs := make([]*spider.Request, 0)
+	req := &spider.Request{}
 	u, ok := jreq["Url"].(string)
 	if !ok {
 		return nil
@@ -61,12 +62,12 @@ func AddJsReq(jreq map[string]interface{}) []*collect.Request {
 	return reqs
 }
 
-func (c *CrawlerStore) AddJSTask(m *collect.TaskModle) {
-	task := &collect.Task{
-		Property: m.Property,
+func (c *CrawlerStore) AddJSTask(m *spider.TaskModle) {
+	task := &spider.Task{
+		//Property: m.Property,
 	}
 
-	task.Rule.Root = func() ([]*collect.Request, error) {
+	task.Rule.Root = func() ([]*spider.Request, error) {
 		vm := otto.New()
 		vm.Set("AddJsReq", AddJsReqs)
 		v, err := vm.Eval(m.Root)
@@ -77,32 +78,32 @@ func (c *CrawlerStore) AddJSTask(m *collect.TaskModle) {
 		if err != nil {
 			return nil, err
 		}
-		return e.([]*collect.Request), nil
+		return e.([]*spider.Request), nil
 	}
 
 	for _, r := range m.Rules {
-		paesrFunc := func(parse string) func(ctx *collect.Context) (collect.ParseResult, error) {
-			return func(ctx *collect.Context) (collect.ParseResult, error) {
+		paesrFunc := func(parse string) func(ctx *spider.Context) (spider.ParseResult, error) {
+			return func(ctx *spider.Context) (spider.ParseResult, error) {
 				vm := otto.New()
 				vm.Set("ctx", ctx)
 				v, err := vm.Eval(parse)
 				if err != nil {
-					return collect.ParseResult{}, err
+					return spider.ParseResult{}, err
 				}
 				e, err := v.Export()
 				if err != nil {
-					return collect.ParseResult{}, err
+					return spider.ParseResult{}, err
 				}
 				if e == nil {
-					return collect.ParseResult{}, err
+					return spider.ParseResult{}, err
 				}
-				return e.(collect.ParseResult), err
+				return e.(spider.ParseResult), err
 			}
 		}(r.ParseFunc)
 		if task.Rule.Trunk == nil {
-			task.Rule.Trunk = make(map[string]*collect.Rule, 0)
+			task.Rule.Trunk = make(map[string]*spider.Rule, 0)
 		}
-		task.Rule.Trunk[r.Name] = &collect.Rule{
+		task.Rule.Trunk[r.Name] = &spider.Rule{
 			ParseFunc: paesrFunc,
 		}
 	}
@@ -113,8 +114,8 @@ func (c *CrawlerStore) AddJSTask(m *collect.TaskModle) {
 
 // 全局爬虫任务实例
 var Store = &CrawlerStore{
-	list: []*collect.Task{},
-	Hash: map[string]*collect.Task{},
+	list: []*spider.Task{},
+	Hash: map[string]*spider.Task{},
 }
 
 func GetFields(taskName string, ruleName string) []string {
@@ -122,16 +123,16 @@ func GetFields(taskName string, ruleName string) []string {
 }
 
 type CrawlerStore struct {
-	list []*collect.Task
-	Hash map[string]*collect.Task
+	list []*spider.Task
+	Hash map[string]*spider.Task
 }
 
 type Crawler struct {
-	out         chan collect.ParseResult
+	out         chan spider.ParseResult
 	Visited     map[string]bool // 存储请求访问信息，Visited 中的 Key 是请求的唯一标识，URL + method，并使用 MD5 生成唯一键
 	VisitedLock sync.Mutex      // 确保并发安全
 
-	failures    map[string]*collect.Request // 失败请求id -> 失败请求
+	failures    map[string]*spider.Request // 失败请求id -> 失败请求
 	failureLock sync.Mutex
 
 	options
@@ -139,15 +140,15 @@ type Crawler struct {
 
 type Scheduler interface {
 	Schedule()
-	Push(...*collect.Request)
-	Pull() *collect.Request
+	Push(...*spider.Request)
+	Pull() *spider.Request
 }
 
 type Schedule struct {
-	requestCh   chan *collect.Request // 接收请求
-	workerCh    chan *collect.Request // 分配任务给worker
-	priReqQueue []*collect.Request    // 优先队列
-	reqQueue    []*collect.Request    // 普通队列
+	requestCh   chan *spider.Request // 接收请求
+	workerCh    chan *spider.Request // 分配任务给worker
+	priReqQueue []*spider.Request    // 优先队列
+	reqQueue    []*spider.Request    // 普通队列
 	Logger      *zap.Logger
 }
 
@@ -158,16 +159,16 @@ func NewEngine(opts ...Option) *Crawler {
 	}
 	e := &Crawler{}
 	e.Visited = make(map[string]bool, 100)
-	e.out = make(chan collect.ParseResult)
-	e.failures = make(map[string]*collect.Request)
+	e.out = make(chan spider.ParseResult)
+	e.failures = make(map[string]*spider.Request)
 	e.options = options
 	return e
 }
 
 func NewSchedule() *Schedule {
 	s := &Schedule{}
-	requestCh := make(chan *collect.Request)
-	workerCh := make(chan *collect.Request)
+	requestCh := make(chan *spider.Request)
+	workerCh := make(chan *spider.Request)
 	s.requestCh = requestCh
 	s.workerCh = workerCh
 	return s
@@ -182,26 +183,26 @@ func (e *Crawler) Run() {
 }
 
 // 将请求放入到调度器中
-func (s *Schedule) Push(reqs ...*collect.Request) {
+func (s *Schedule) Push(reqs ...*spider.Request) {
 	for _, req := range reqs {
 		s.requestCh <- req
 	}
 }
 
 // 从调度器中获取请求
-func (s *Schedule) Pull() *collect.Request {
+func (s *Schedule) Pull() *spider.Request {
 	r := <-s.workerCh
 	return r
 }
 
-func (s *Schedule) Output() *collect.Request {
+func (s *Schedule) Output() *spider.Request {
 	r := <-s.workerCh
 	return r
 }
 
 func (s *Schedule) Schedule() {
-	var req *collect.Request
-	var ch chan *collect.Request
+	var req *spider.Request
+	var ch chan *spider.Request
 	for {
 		if req == nil && len(s.priReqQueue) > 0 {
 			req = s.priReqQueue[0]
@@ -229,18 +230,22 @@ func (s *Schedule) Schedule() {
 }
 
 // 启动调度器
-func (e *Crawler) Schedule() {
-	var reqs []*collect.Request
-	for _, seed := range e.Seeds {
-		task := Store.Hash[seed.Name]
-		task.Fetcher = seed.Fetcher
-		task.Storage = seed.Storage
-		task.Limit = seed.Limit
+func (c *Crawler) Schedule() {
+	var reqs []*spider.Request
+
+	for _, task := range c.Seeds {
+		t, ok := Store.Hash[task.Name]
+		if !ok {
+			c.Logger.Error("can not find preset tasks", zap.String("task name", task.Name))
+			continue
+		}
+		task.Rule = t.Rule
 		rootreqs, err := task.Rule.Root()
 		if err != nil {
-			e.Logger.Error("get root failed",
+			c.Logger.Error("get root failed",
 				zap.Error(err),
 			)
+
 			continue
 		}
 		for _, req := range rootreqs {
@@ -248,8 +253,8 @@ func (e *Crawler) Schedule() {
 		}
 		reqs = append(reqs, rootreqs...)
 	}
-	go e.scheduler.Schedule()
-	go e.scheduler.Push(reqs...)
+	go c.scheduler.Schedule()
+	go c.scheduler.Push(reqs...)
 }
 
 func (s *Crawler) CreateWork() {
@@ -296,7 +301,7 @@ func (s *Crawler) CreateWork() {
 		}
 
 		rule := req.Task.Rule.Trunk[req.RuleName]
-		result, err := rule.ParseFunc(&collect.Context{
+		result, err := rule.ParseFunc(&spider.Context{
 			body,
 			req,
 		})
@@ -322,7 +327,7 @@ func (s *Crawler) HandleResult() {
 		case result := <-s.out:
 			for _, item := range result.Items {
 				switch d := item.(type) {
-				case *storage.DataCell:
+				case *spider.DataCell:
 					name := d.GetTaskName()
 					task := Store.Hash[name]
 					task.Storage.Save(d)
@@ -333,14 +338,14 @@ func (s *Crawler) HandleResult() {
 	}
 }
 
-func (e *Crawler) HasVisited(r *collect.Request) bool {
+func (e *Crawler) HasVisited(r *spider.Request) bool {
 	e.VisitedLock.Lock()
 	defer e.VisitedLock.Unlock()
 	unique := r.Unique()
 	return e.Visited[unique]
 }
 
-func (e *Crawler) StoreVisited(reqs ...*collect.Request) {
+func (e *Crawler) StoreVisited(reqs ...*spider.Request) {
 	e.VisitedLock.Lock()
 	defer e.VisitedLock.Unlock()
 
@@ -350,7 +355,7 @@ func (e *Crawler) StoreVisited(reqs ...*collect.Request) {
 	}
 }
 
-func (e *Crawler) SetFailure(req *collect.Request) {
+func (e *Crawler) SetFailure(req *spider.Request) {
 	if !req.Task.Reload {
 		e.VisitedLock.Lock()
 		unique := req.Unique()

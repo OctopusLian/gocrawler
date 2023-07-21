@@ -1,4 +1,4 @@
-package collect
+package spider
 
 // 采集规则树
 type RuleTree struct {
@@ -9,6 +9,6 @@ type RuleTree struct {
 // 采集规则节点
 type Rule struct {
 	ItemFields []string
-	// TODO: return *ParseResult
+	// todo: return *ParseResult
 	ParseFunc func(*Context) (ParseResult, error) // 内容解析函数
 }

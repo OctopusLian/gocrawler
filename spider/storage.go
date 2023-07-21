@@ -1,6 +1,11 @@
-package storage
+package spider
+
+type Storage interface {
+	Save(datas ...*DataCell) error
+}
 
 type DataCell struct {
+	Task *Task
 	Data map[string]interface{}
 }
 
@@ -10,8 +15,4 @@ func (d *DataCell) GetTableName() string {
 
 func (d *DataCell) GetTaskName() string {
 	return d.Data["Task"].(string)
-}
-
-type Storage interface {
-	Save(datas ...*DataCell) error // 任何实现了 Save 方法的后端引擎都可以存储数据
 }

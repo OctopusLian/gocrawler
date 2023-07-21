@@ -6,6 +6,7 @@ import (
 	"go.uber.org/zap"
 	"gocrawler/extensions"
 	"gocrawler/proxy"
+	"gocrawler/spider"
 	"golang.org/x/net/html/charset"
 	"golang.org/x/text/encoding"
 	"golang.org/x/text/encoding/unicode"
@@ -16,15 +17,11 @@ import (
 	"time"
 )
 
-type Fetcher interface {
-	Get(url *Request) ([]byte, error)
-}
-
 type BaseFetch struct {
 }
 
 // 实现 Fetcher 接口
-func (BaseFetch) Get(req *Request) ([]byte, error) {
+func (BaseFetch) Get(req *spider.Request) ([]byte, error) {
 	resp, err := http.Get(req.URL)
 
 	if err != nil {
@@ -49,7 +46,7 @@ type BrowserFetch struct {
 }
 
 // 模拟浏览器访问
-func (b BrowserFetch) Get(request *Request) ([]byte, error) {
+func (b BrowserFetch) Get(request *spider.Request) ([]byte, error) {
 	client := &http.Client{
 		Timeout: b.Timeout,
 	}
