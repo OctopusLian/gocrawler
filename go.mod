@@ -20,7 +20,9 @@ require (
 	github.com/go-micro/plugins/v4/config/encoder/toml v1.2.0
 	github.com/go-micro/plugins/v4/registry/etcd v1.2.0
 	github.com/go-micro/plugins/v4/server/grpc v1.2.0
+	github.com/go-micro/plugins/v4/wrapper/ratelimiter/ratelimit v1.2.0
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.16.0
+	github.com/juju/ratelimit v1.0.2
 	github.com/spf13/cobra v1.6.1
 	github.com/stretchr/testify v1.8.4
 	go.etcd.io/etcd/client/v3 v3.5.9

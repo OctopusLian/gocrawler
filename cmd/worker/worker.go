@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"fmt"
 	"github.com/go-micro/plugins/v4/config/encoder/toml"
 	"github.com/go-micro/plugins/v4/registry/etcd"
 	"github.com/go-micro/plugins/v4/server/grpc"
@@ -20,6 +21,7 @@ import (
 	"go.uber.org/zap/zapcore"
 	"gocrawler/collect"
 	"gocrawler/engine"
+	"gocrawler/generator"
 	"gocrawler/limiter"
 	"gocrawler/log"
 	"gocrawler/proto/greeter"
@@ -30,6 +32,7 @@ import (
 	grpc2 "google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"net/http"
+	"strconv"
 	"time"
 )
 
@@ -61,6 +64,7 @@ var workerID string
 var HTTPListenAddress string
 var GRPCListenAddress string
 var PProfListenAddress string
+var podIP string
 
 func Run() {
 	go func() {
@@ -132,22 +136,36 @@ func Run() {
 	}
 	seeds := ParseTaskConfig(logger, f, storage, tcfg)
 
-	_ = engine.NewEngine(
-		engine.WithFetcher(f),
-		engine.WithLogger(logger),
-		engine.WithWorkCount(5),
-		engine.WithSeeds(seeds),
-		engine.WithScheduler(engine.NewSchedule()),
-	)
-
-	// worker start
-	//go s.Run()
-
 	var sconfig ServerConfig
 	if err := cfg.Get("GRPCServer").Scan(&sconfig); err != nil {
 		logger.Error("get GRPC Server config failed", zap.Error(err))
 	}
 	logger.Sugar().Debugf("grpc server config,%+v", sconfig)
+
+	_ = engine.NewEngine(
+		engine.WithFetcher(f),
+		engine.WithLogger(logger),
+		engine.WithWorkCount(5),
+		engine.WithSeeds(seeds),
+		engine.WithregistryURL(sconfig.RegistryAddress),
+		engine.WithScheduler(engine.NewSchedule()),
+		engine.WithStorage(storage),
+	)
+
+	if workerID == "" {
+		if podIP != "" {
+			ip := generator.GetIDbyIP(podIP)
+			workerID = strconv.Itoa(int(ip))
+		} else {
+			workerID = fmt.Sprintf("%d", time.Now().UnixNano())
+		}
+	}
+
+	id := sconfig.Name + "-" + workerID
+	zap.S().Debug("worker id:", id)
+
+	// worker start
+	//go s.Run()
 
 	// start http proxy to GRPC
 	go RunHTTPServer(sconfig)

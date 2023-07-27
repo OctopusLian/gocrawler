@@ -3,10 +3,13 @@ package master
 import (
 	"context"
 	"fmt"
+	grpccli "github.com/go-micro/plugins/v4/client/grpc"
 	"github.com/go-micro/plugins/v4/config/encoder/toml"
 	"github.com/go-micro/plugins/v4/registry/etcd"
 	"github.com/go-micro/plugins/v4/server/grpc"
+	ratePlugin "github.com/go-micro/plugins/v4/wrapper/ratelimiter/ratelimit"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
+	"github.com/juju/ratelimit"
 	"github.com/spf13/cobra"
 	"go-micro.dev/v4"
 	"go-micro.dev/v4/client"
@@ -19,12 +22,14 @@ import (
 	"go-micro.dev/v4/server"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"gocrawler/generator"
 	"gocrawler/log"
 	"gocrawler/master"
 	"gocrawler/proto/greeter"
 	grpc2 "google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"net/http"
+	"strconv"
 	"time"
 )
 
@@ -54,6 +59,7 @@ var masterID string
 var HTTPListenAddress string
 var GRPCListenAddress string
 var PProfListenAddress string
+var podIP string
 
 func Run() {
 	// start pprof
@@ -130,6 +136,17 @@ type ServerConfig struct {
 }
 
 func RunGRPCServer(logger *zap.Logger, reg registry.Registry, cfg ServerConfig) {
+	b := ratelimit.NewBucketWithRate(0.5, 1)
+	if masterID == "" {
+		if podIP != "" {
+			ip := generator.GetIDbyIP(podIP)
+			masterID = strconv.Itoa(int(ip))
+		} else {
+			masterID = fmt.Sprintf("%d", time.Now().UnixNano())
+		}
+	}
+	zap.S().Debug("master id:", masterID)
+
 	service := micro.NewService(
 		micro.Server(grpc.NewServer(
 			server.Id(cfg.ID),
@@ -139,7 +156,9 @@ func RunGRPCServer(logger *zap.Logger, reg registry.Registry, cfg ServerConfig) 
 		micro.RegisterTTL(time.Duration(cfg.RegisterTTL)*time.Second),
 		micro.RegisterInterval(time.Duration(cfg.RegisterInterval)*time.Second),
 		micro.WrapHandler(logWrapper(logger)),
+		micro.WrapHandler(ratePlugin.NewHandlerWrapper(b, false)),
 		micro.Name(cfg.Name),
+		micro.Client(grpccli.NewClient()),
 	)
 
 	// 设置micro 客户端默认超时时间为10秒钟
