@@ -1,0 +1,30 @@
+apiVersion: apps/v1  # 定义创建对象时使用的 Kubernetes API 的版本
+kind: Deployment # 表示当前资源的类型。Deployment 在 Pod 之上增加了自动扩容、自动修复和滚动更新等功能
+metadata:
+  name: crawler-deployment # 定义 deployment 的名字
+  labels: # 给 Deployment 的标签
+    app: crawl-worker
+spec: # 代表对象的期望状态
+  replicas: 1 # 代表创建和管理的 Pod 的数量
+  selector: # 定义了 Deployment Controller 要管理哪些 Pod。这里定义的通常是标签匹配的 Pod，满足该标签的 Pod 会被纳入到 Deployment Controller 中去管理。
+    matchLabels:
+      app: crawl-worker
+  template:
+    metadata: # 定义了 Pod 的属性
+      labels:
+        app: crawler-worker
+    spec:
+      containers: # 定义了 Pod 中的容器属性
+        - name: crawler-worker # 定义了容器的名字
+          image: crawler:local # 定义了容器的镜像
+          command: # 定义了容器的启动命令
+            - sh
+            - -c
+            - "./crawler worker --podip=${MY_POD_IP}"  # ${MY_POD_IP} 是从环境变量中获取的 MY_POD_IP 对应的值
+          ports: # 描述服务暴露的端口信息，方便开发者更好地理解服务，没有实际的作用
+            - containerPort: 8080
+          env: # 定义容器的环境变量
+            - name: MY_POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP  # Pod 的 IP

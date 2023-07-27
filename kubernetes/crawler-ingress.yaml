@@ -1,0 +1,15 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: crawler-ingress
+spec:
+  rules:
+    - http:
+        paths:
+          - path: / # URL 匹配的路径
+            pathType: Prefix # URL 匹配的类型为前缀匹配
+            backend:
+              service:
+                name: crawler-master # 路由到后端的 Service 的名字
+                port: # 路由到后端的 Service 的端口
+                  number: 80

@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: crawler-master-deployment
+  labels:
+    app: crawl-master
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: crawler-master
+  template:
+    metadata:
+      labels:
+        app: crawler-master
+    spec:
+      containers:
+        - name: crawler-master
+          image: crawler:local
+          command:
+            - sh
+            - -c
+            - "./crawler master --podip=${MY_POD_IP}"
+          ports:
+            - containerPort: 8081
+          env:
+            - name: MY_POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+          volumeMounts:
+          - mountPath: crawler-config
+            name: /app/config/ # 将该存储卷挂载到容器的 /app/config 目录下
+      volumes:
+      - name: crawler-config # 创建了一个存储卷 crawler-config
+        configMap:
+          name: crawler-config

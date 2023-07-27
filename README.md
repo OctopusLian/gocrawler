@@ -69,3 +69,13 @@ golangci-lint run
 
 # 动态扫描
 ```
+
+按照k3d  
+```
+curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
+
+brew install k3d
+
+git clone https://github.com/k3d-io/k3d-demo
+make demo
+```

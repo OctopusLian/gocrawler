@@ -1,0 +1,14 @@
+kind: Service # 指的是当前的 Kubernetes 资源类型为 Service
+apiVersion: v1 # 代表 apiVersion 的版本是 v1，由于 Service 是核心类型，因此省略掉了 API GROUP 的命名前缀
+metadata:
+  name: crawl-worker
+  labels: # 当前 Service 的标签
+    app: crawler-worker
+spec:
+  selector: # 选择器，表示当前 Service 管理哪些后台服务，只有标签为 app: crawl-worker 的 Pod 才会受到该 Service 的管理，这些 Pod 就是我们的 Worker 节点
+    app: crawler-worker
+  ports: # 当前 Service 监听的端口号
+    - port: 8080 # 当前 Service 会监听 8080 端口。默认情况下，当外部访问该 Service 的 8080 端口时，会将请求转发给后端服务相同的端口
+      name: http # 描述了当前 Service 端口规则的名字
+    - port: 9090
+      name: grpc
