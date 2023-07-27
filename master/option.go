@@ -3,6 +3,7 @@ package master
 import (
 	"go-micro.dev/v4/registry"
 	"go.uber.org/zap"
+	"gocrawler/spider"
 )
 
 type options struct {
@@ -10,6 +11,7 @@ type options struct {
 	registryURL string
 	GRPCAddress string
 	registry    registry.Registry
+	Seeds       []*spider.Task
 }
 
 var defaultOptions = options{
@@ -39,5 +41,11 @@ func WithGRPCAddress(GRPCAddress string) Option {
 func WithRegistry(registry registry.Registry) Option {
 	return func(opts *options) {
 		opts.registry = registry
+	}
+}
+
+func WithSeeds(seed []*spider.Task) Option {
+	return func(opts *options) {
+		opts.Seeds = seed
 	}
 }
