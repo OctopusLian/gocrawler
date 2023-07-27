@@ -16,6 +16,10 @@ type roundRobinSwitcher struct {
 
 // 取余算法实现轮询调度
 func (r *roundRobinSwitcher) GetProxy(pr *http.Request) (*url.URL, error) {
+	if len(r.proxyURLs) == 0 {
+		return nil, errors.New("empty proxy urls")
+	}
+
 	index := atomic.AddUint32(&r.index, 1) - 1
 	u := r.proxyURLs[index%uint32(len(r.proxyURLs))]
 	return u, nil
