@@ -7,16 +7,6 @@ import (
 	"gocrawler/version"
 )
 
-var workerCmd = &cobra.Command{
-	Use:   "worker",
-	Short: "run worker service.",
-	Long:  "run worker service.",
-	Args:  cobra.NoArgs,
-	Run: func(cmd *cobra.Command, args []string) {
-		worker.Run()
-	},
-}
-
 var masterCmd = &cobra.Command{
 	Use:   "master",
 	Short: "run master service.",
@@ -39,6 +29,6 @@ var versionCmd = &cobra.Command{
 
 func Execute() {
 	var rootCmd = &cobra.Command{Use: "crawler"}
-	rootCmd.AddCommand(masterCmd, workerCmd, versionCmd)
+	rootCmd.AddCommand(masterCmd, worker.WorkerCmd, versionCmd)
 	rootCmd.Execute()
 }

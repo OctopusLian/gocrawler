@@ -7,6 +7,7 @@ import (
 	"github.com/go-micro/plugins/v4/registry/etcd"
 	"github.com/go-micro/plugins/v4/server/grpc"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
+	"github.com/spf13/cobra"
 	"go-micro.dev/v4"
 	"go-micro.dev/v4/client"
 	"go-micro.dev/v4/config"
@@ -19,12 +20,37 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"gocrawler/log"
+	"gocrawler/master"
 	"gocrawler/proto/greeter"
 	grpc2 "google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"net/http"
 	"time"
 )
+
+var MasterCmd = &cobra.Command{
+	Use:   "master",
+	Short: "run master service.",
+	Long:  "run master service.",
+	Args:  cobra.NoArgs,
+	Run: func(cmd *cobra.Command, args []string) {
+		Run()
+	},
+}
+
+func init() {
+	MasterCmd.Flags().StringVar(
+		&masterID, "id", "1", "set master id")
+	MasterCmd.Flags().StringVar(
+		&HTTPListenAddress, "http", ":8081", "set HTTP listen address")
+
+	MasterCmd.Flags().StringVar(
+		&GRPCListenAddress, "grpc", ":9091", "set GRPC listen address")
+}
+
+var masterID string
+var HTTPListenAddress string
+var GRPCListenAddress string
 
 func Run() {
 	var (
@@ -66,11 +92,20 @@ func Run() {
 	}
 	logger.Sugar().Debugf("grpc server config,%+v", sconfig)
 
+	reg := etcd.NewRegistry(registry.Addrs(sconfig.RegistryAddress))
+	master.New(
+		masterID,
+		master.WithLogger(logger.Named("master")),
+		master.WithGRPCAddress(GRPCListenAddress),
+		master.WithregistryURL(sconfig.RegistryAddress),
+		master.WithRegistry(reg),
+	)
+
 	// start http proxy to GRPC
 	go RunHTTPServer(sconfig)
 
 	// start grpc server
-	RunGRPCServer(logger, sconfig)
+	RunGRPCServer(logger, reg, sconfig)
 }
 
 type ServerConfig struct {
@@ -84,8 +119,7 @@ type ServerConfig struct {
 	ClientTimeOut     int
 }
 
-func RunGRPCServer(logger *zap.Logger, cfg ServerConfig) {
-	reg := etcd.NewRegistry(registry.Addrs(cfg.RegistryAddress))
+func RunGRPCServer(logger *zap.Logger, reg registry.Registry, cfg ServerConfig) {
 	service := micro.NewService(
 		micro.Server(grpc.NewServer(
 			server.Id(cfg.ID),
