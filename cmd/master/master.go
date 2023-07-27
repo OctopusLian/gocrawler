@@ -46,13 +46,23 @@ func init() {
 
 	MasterCmd.Flags().StringVar(
 		&GRPCListenAddress, "grpc", ":9091", "set GRPC listen address")
+	MasterCmd.Flags().StringVar(
+		&GRPCListenAddress, "pprof", ":9981", "set GRPC listen address")
 }
 
 var masterID string
 var HTTPListenAddress string
 var GRPCListenAddress string
+var PProfListenAddress string
 
 func Run() {
+	// start pprof
+	go func() {
+		if err := http.ListenAndServe(PProfListenAddress, nil); err != nil {
+			panic(err)
+		}
+	}()
+
 	var (
 		err    error
 		logger *zap.Logger
