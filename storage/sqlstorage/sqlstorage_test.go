@@ -51,7 +51,7 @@ func TestSQLStorage_Flush(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := &SQLStorage{
+			s := &SQLStore{
 				dataDocker: tt.fields.dataDocker,
 				db:         mysqldb{},
 				options:    tt.fields.options,
