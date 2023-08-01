@@ -214,6 +214,19 @@ func (s *Schedule) Schedule() {
 			s.reqQueue = s.reqQueue[1:]
 			ch = s.workerCh
 		}
+
+		// 请求校验
+		if req != nil {
+			if err := req.Check(); err != nil {
+				zap.L().Debug("check failed",
+					zap.Error(err),
+				)
+				req = nil
+				ch = nil
+				continue
+			}
+		}
+
 		select {
 		case r := <-s.requestCh:
 			if r.Priority > 0 {

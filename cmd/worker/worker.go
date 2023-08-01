@@ -58,7 +58,11 @@ func init() {
 		&GRPCListenAddress, "grpc", ":9090", "set GRPC listen address")
 	WorkerCmd.Flags().StringVar(
 		&PProfListenAddress, "pprof", ":9981", "set GRPC listen address")
+	WorkerCmd.Flags().BoolVar(
+		&cluster, "cluster", true, "run mode")
 }
+
+var cluster bool
 
 var workerID string
 var HTTPListenAddress string

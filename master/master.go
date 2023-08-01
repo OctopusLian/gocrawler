@@ -7,29 +7,110 @@ import (
 	"fmt"
 	"github.com/bwmarrin/snowflake"
 	"github.com/dreamerjackson/crawler/cmd/worker"
+	proto "github.com/dreamerjackson/crawler/proto/crawler"
+	"github.com/golang/protobuf/ptypes/empty"
+	"go-micro.dev/v4/client"
 	"go-micro.dev/v4/registry"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/client/v3/concurrency"
 	"go.uber.org/zap"
 	"net"
 	"reflect"
+	"sort"
+	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 )
 
 const (
 	RESOURCEPATH = "/resources"
+	ADDRESOURCE  = iota
+	DELETERESOURCE
+
+	ServiceName = "go.micro.server.worker"
 )
 
 type Master struct {
-	ID        string
-	ready     int32
-	leaderID  string
-	workNodes map[string]*registry.Node
-	resources map[string]*ResourceSpec
-	IDGen     *snowflake.Node
-	etcdCli   *clientv3.Client
+	ID         string
+	ready      int32
+	leaderID   string
+	workNodes  map[string]*NodeSpec
+	resources  map[string]*ResourceSpec
+	IDGen      *snowflake.Node
+	etcdCli    *clientv3.Client
+	forwardCli proto.CrawlerMasterService
+	rlock      sync.Mutex
+
 	options
+}
+
+func (m *Master) SetForwardCli(forwardCli proto.CrawlerMasterService) {
+	m.forwardCli = forwardCli
+}
+
+func (m *Master) DeleteResource(ctx context.Context, spec *proto.ResourceSpec, empty *empty.Empty) error {
+
+	if !m.IsLeader() && m.leaderID != "" && m.leaderID != m.ID {
+		addr := getLeaderAddress(m.leaderID)
+		_, err := m.forwardCli.DeleteResource(ctx, spec, client.WithAddress(addr))
+		return err
+	}
+
+	m.rlock.Lock()
+	defer m.rlock.Unlock()
+
+	r, ok := m.resources[spec.Name]
+
+	if !ok {
+		return errors.New("no such task")
+	}
+
+	if _, err := m.etcdCli.Delete(context.Background(), getResourcePath(spec.Name)); err != nil {
+		return err
+	}
+
+	delete(m.resources, spec.Name)
+
+	if r.AssignedNode != "" {
+		nodeID, err := getNodeID(r.AssignedNode)
+		if err != nil {
+			return err
+		}
+
+		if ns, ok := m.workNodes[nodeID]; ok {
+			ns.Payload -= 1
+		}
+	}
+
+	return nil
+}
+
+func (m *Master) AddResource(ctx context.Context, req *proto.ResourceSpec, resp *proto.NodeSpec) error {
+	if !m.IsLeader() && m.leaderID != "" && m.leaderID != m.ID {
+		addr := getLeaderAddress(m.leaderID)
+		nodeSpec, err := m.forwardCli.AddResource(ctx, req, client.WithAddress(addr))
+		resp.Id = nodeSpec.Id
+		resp.Address = nodeSpec.Address
+		return err
+	}
+
+	m.rlock.Lock()
+	defer m.rlock.Unlock()
+	nodeSpec, err := m.addResources(&ResourceSpec{Name: req.Name})
+	if nodeSpec != nil {
+		resp.Id = nodeSpec.Node.Id
+		resp.Address = nodeSpec.Node.Address
+	}
+	return err
+}
+
+func getLeaderAddress(address string) string {
+	s := strings.Split(address, "-")
+	if len(s) < 2 {
+		return ""
+	}
+	return s[1]
 }
 
 func New(id string, opts ...Option) (*Master, error) {
@@ -64,7 +145,6 @@ func New(id string, opts ...Option) (*Master, error) {
 	m.updateWorkNodes()
 	m.AddSeed()
 	go m.Campaign()
-	go m.HandleMsg()
 
 	return &Master{}, nil
 }
@@ -170,21 +250,24 @@ func (m *Master) BecomeLeader() error {
 }
 
 func (m *Master) updateWorkNodes() {
-	services, err := m.registry.GetService(worker.ServiceName)
+	services, err := m.registry.GetService(ServiceName)
 	if err != nil {
 		m.logger.Error("get service", zap.Error(err))
 	}
 
-	nodes := make(map[string]*registry.Node)
+	m.rlock.Lock()
+	defer m.rlock.Unlock()
+	nodes := make(map[string]*NodeSpec)
 	if len(services) > 0 {
 		for _, spec := range services[0].Nodes {
-			nodes[spec.Id] = spec
+			nodes[spec.Id] = &NodeSpec{
+				Node: spec,
+			}
 		}
 	}
 
 	added, deleted, changed := workNodeDiff(m.workNodes, nodes)
 	m.logger.Sugar().Info("worker joined: ", added, ", leaved: ", deleted, ", changed: ", changed)
-
 	m.workNodes = nodes
 }
 
@@ -198,6 +281,11 @@ const (
 type Message struct {
 	Cmd   Command
 	Specs []*ResourceSpec
+}
+
+type NodeSpec struct {
+	Node    *registry.Node
+	Payload int
 }
 
 type ResourceSpec struct {
@@ -216,57 +304,63 @@ func encode(s *ResourceSpec) string {
 	return string(b)
 }
 
-func decode(ds []byte) (*ResourceSpec, error) {
+func Decode(ds []byte) (*ResourceSpec, error) {
 	var s *ResourceSpec
 	err := json.Unmarshal(ds, &s)
 	return s, err
 }
 
-func (m *Master) AddResource(rs []*ResourceSpec) {
-	for _, r := range rs {
-		r.ID = m.IDGen.Generate().String()
-		ns, err := m.Assign(r)
-		if err != nil {
-			m.logger.Error("assign failed", zap.Error(err))
-			continue
-		}
-		r.AssignedNode = ns.Id + "|" + ns.Address
-		r.CreationTime = time.Now().UnixNano()
-		m.logger.Debug("add resource", zap.Any("specs", r))
-
-		_, err = m.etcdCli.Put(context.Background(), getResourcePath(r.Name), encode(r))
-		if err != nil {
-			m.logger.Error("put etcd failed", zap.Error(err))
-			continue
-		}
-		m.resources[r.Name] = r
+func (m *Master) addResources(r *ResourceSpec) (*NodeSpec, error) {
+	r.ID = m.IDGen.Generate().String()
+	ns, err := m.Assign(r)
+	if err != nil {
+		m.logger.Error("assign failed", zap.Error(err))
+		return nil, err
 	}
+
+	if ns.Node == nil {
+		m.logger.Error("no node to assgin")
+		return nil, err
+	}
+
+	r.AssignedNode = ns.Node.Id + "|" + ns.Node.Address
+	r.CreationTime = time.Now().UnixNano()
+	m.logger.Debug("add resource", zap.Any("specs", r))
+
+	_, err = m.etcdCli.Put(context.Background(), getResourcePath(r.Name), encode(r))
+	if err != nil {
+		m.logger.Error("put etcd failed", zap.Error(err))
+		return nil, err
+	}
+	m.resources[r.Name] = r
+	ns.Payload++
+	return ns, nil
 }
 
-func (m *Master) HandleMsg() {
-	msgCh := make(chan *Message)
+func (m *Master) Assign(r *ResourceSpec) (*NodeSpec, error) {
 
-	select {
-	case msg := <-msgCh:
-		switch msg.Cmd {
-		case MSGADD:
-			m.AddResource(msg.Specs)
-		}
+	candidates := make([]*NodeSpec, 0, len(m.workNodes))
+
+	for _, node := range m.workNodes {
+		candidates = append(candidates, node)
 	}
 
-}
+	//  找到最低的负载
+	sort.Slice(candidates, func(i, j int) bool {
+		return candidates[i].Payload < candidates[j].Payload
+	})
 
-func (m *Master) Assign(r *ResourceSpec) (*registry.Node, error) {
-	for _, n := range m.workNodes {
-		return n, nil
+	if len(candidates) > 0 {
+		return candidates[0], nil
 	}
+
 	return nil, errors.New("no worker nodes")
 }
 
 func (m *Master) AddSeed() {
 	rs := make([]*ResourceSpec, 0, len(m.Seeds))
 	for _, seed := range m.Seeds {
-		resp, err := m.etcdCli.Get(context.Background(), getResourcePath(seed.Name), clientv3.WithSerializable())
+		resp, err := m.etcdCli.Get(context.Background(), getResourcePath(seed.Name), clientv3.WithPrefix(), clientv3.WithSerializable())
 		if err != nil {
 			m.logger.Error("etcd get faiiled", zap.Error(err))
 			continue
@@ -279,28 +373,83 @@ func (m *Master) AddSeed() {
 		}
 	}
 
-	m.AddResource(rs)
+	for _, r := range rs {
+		m.addResources(r)
+	}
 }
 
 func (m *Master) loadResource() error {
-	resp, err := m.etcdCli.Get(context.Background(), RESOURCEPATH, clientv3.WithSerializable())
+	resp, err := m.etcdCli.Get(context.Background(), RESOURCEPATH, clientv3.WithPrefix(), clientv3.WithSerializable())
 	if err != nil {
 		return fmt.Errorf("etcd get failed")
 	}
 
 	resources := make(map[string]*ResourceSpec)
 	for _, kv := range resp.Kvs {
-		r, err := decode(kv.Value)
+		r, err := Decode(kv.Value)
 		if err == nil && r != nil {
 			resources[r.Name] = r
 		}
 	}
 	m.logger.Info("leader init load resource", zap.Int("lenth", len(m.resources)))
+	m.rlock.Lock()
+	defer m.rlock.Unlock()
 	m.resources = resources
+
+	for _, r := range m.resources {
+		if r.AssignedNode != "" {
+			id, err := getNodeID(r.AssignedNode)
+			if err != nil {
+				m.logger.Error("getNodeID failed", zap.Error(err))
+			}
+			node, ok := m.workNodes[id]
+			if ok {
+				node.Payload++
+			}
+		}
+	}
+
 	return nil
 }
 
-func workNodeDiff(old map[string]*registry.Node, new map[string]*registry.Node) ([]string, []string, []string) {
+func (m *Master) reAssign() {
+	rs := make([]*ResourceSpec, 0, len(m.resources))
+
+	m.rlock.Lock()
+	defer m.rlock.Unlock()
+
+	for _, r := range m.resources {
+		if r.AssignedNode == "" {
+			rs = append(rs, r)
+			continue
+		}
+
+		id, err := getNodeID(r.AssignedNode)
+
+		if err != nil {
+			m.logger.Error("get nodeid failed", zap.Error(err))
+		}
+
+		if _, ok := m.workNodes[id]; !ok {
+			rs = append(rs, r)
+		}
+	}
+
+	for _, r := range rs {
+		m.addResources(r)
+	}
+}
+
+func getNodeID(assigned string) (string, error) {
+	node := strings.Split(assigned, "|")
+	if len(node) < 2 {
+		return "", errors.New("")
+	}
+	id := node[0]
+	return id, nil
+}
+
+func workNodeDiff(old map[string]*NodeSpec, new map[string]*NodeSpec) ([]string, []string, []string) {
 	added := make([]string, 0)
 	deleted := make([]string, 0)
 	changed := make([]string, 0)
